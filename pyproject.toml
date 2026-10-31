@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "omni-agent-invoke"
+version = "0.1.0"
+description = "Invoke Codex, Claude Code, OpenClaw and DeepSeek Harness (DSH) from Python through Octo Runtime"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = []
+keywords = ["agent-harness", "codex", "claude-code", "openclaw", "deepseek-harness", "octo-runtime"]
+
+[project.urls]
+Homepage = "https://github.com/superalsrk/omni-agent-invoke-py"
+Repository = "https://github.com/superalsrk/omni-agent-invoke-py"
+
+[project.scripts]
+playboard = "omni_agent_invoke.playboard:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/omni_agent_invoke"]

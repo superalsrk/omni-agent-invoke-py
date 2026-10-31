@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-31T13:50:11.834Z",
+  "language": "Python",
+  "provider": "codex",
+  "kernel": "existing",
+  "runs": [
+    {
+      "mode": "canonical",
+      "frames": 22,
+      "terminal": "completed",
+      "receiptLookup": true,
+      "replay": true,
+      "consumedCursor": true
+    },
+    {
+      "mode": "native",
+      "frames": 27,
+      "terminal": "completed",
+      "receiptLookup": true,
+      "replay": true,
+      "consumedCursor": true
+    }
+  ],
+  "verified": true,
+  "ipcVersion": 1
+}

@@ -1,4 +1,4 @@
-"""Independent, MIT-licensed implementation of Octo Kernel IPC v1."""
+"""Independent, MIT-licensed implementation of Octo Kernel IPC v2."""
 
 import asyncio
 import copy
@@ -45,7 +45,9 @@ def validate(_definition, request):
         or not request["inputs"]
     ):
         raise KernelError("INVALID_INPUT")
-    context = request.get("contexts")
+    if "contexts" in request or "controlInstructions" in request:
+        raise KernelError("INVALID_INPUT")
+    context = request.get("agentEnv")
     if (
         not isinstance(context, dict)
         or set(context) != {"schema", "items"}
@@ -58,6 +60,8 @@ def validate(_definition, request):
         if not isinstance(item, dict) or not isinstance(item.get("payload"), dict):
             raise KernelError("INVALID_CONTEXT")
         key = (item.get("namespace"), item.get("name"))
+        if key == ("octo.control", "instructions"):
+            raise KernelError("CONTROL_INSTRUCTIONS_REMOVED")
         if any(not isinstance(value, str) or not value for value in key) or key in seen:
             raise KernelError("INVALID_CONTEXT")
         seen.add(key)
@@ -261,7 +265,7 @@ class KernelClient:
         value = await self._rpc(METHODS["status"], {})
         if (
             not isinstance(value, dict)
-            or value.get("ipc_version") != 1
+            or value.get("ipc_version") != 2
             or not value.get("kernel_instance_id")
         ):
             raise KernelError("INVALID_RESPONSE")

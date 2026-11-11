@@ -1,7 +1,7 @@
 import asyncio
 import os
 import sys
-from omni_agent_invoke import Client
+from omni_agent_invoke import Client, build_input
 
 
 async def run(client, adapter):
@@ -17,7 +17,7 @@ async def run(client, adapter):
         ],
     }
     stream = (
-        client.invoke_with_context(adapter, prompt, context)
+        client.invoke_input(build_input([{"type":"text","text":prompt}], context, "canonical"))
         if adapter == "openclaw"
         else client.invoke(adapter, prompt)
     )

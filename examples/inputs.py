@@ -4,7 +4,7 @@ import json
 import mimetypes
 import os
 from pathlib import Path
-from omni_agent_invoke import Client, Context, build_input, image_input
+from omni_agent_invoke import Client, AgentEnv, build_input, image_input
 from omni_agent_invoke.kernel import terminal
 
 
@@ -14,18 +14,10 @@ async def main():
     parser.add_argument("--native", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    context: Context = {
+    agent_env: AgentEnv = {
         "schema": "octo.context-envelope/v3",
         "items": [
-            {
-                "namespace": "octo.content",
-                "name": "inline",
-                "payload": {
-                    "entries": [
-                        {"text": "This is a Python input construction example."}
-                    ]
-                },
-            },
+            {"namespace": "octo.execution", "name": "adapter", "payload": {"type": "codex"}},
             {
                 "namespace": "octo.execution",
                 "name": "limits",
@@ -34,10 +26,10 @@ async def main():
         ],
     }
     request = build_input(
-        "codex",
-        "Reply with OK without using tools.",
+        [{"type": "text", "text": "This is a Python input construction example."},
+         {"type": "text", "text": "Reply with OK without using tools."}],
+        agent_env,
         "native" if args.native else "canonical",
-        context,
     )
     if args.image:
         request["inputs"].append(

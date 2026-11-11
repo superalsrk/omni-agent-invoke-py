@@ -1,78 +1,46 @@
 import copy
 import unittest
 from unittest.mock import Mock
-from omni_agent_invoke import Client, build_input
+from omni_agent_invoke import Client, build_input, image_input
+from omni_agent_invoke.kernel import KernelError, validate
 
 
 class ApiTests(unittest.TestCase):
-    def test_all_four_signatures_select_mode_and_preserve_context(self):
-        context = {
-            "schema": "octo.context-envelope/v3",
-            "items": [
-                {
-                    "namespace": "octo.content",
-                    "name": "inline",
-                    "payload": {"entries": [{"text": "background"}]},
-                }
-            ],
-        }
-        original = copy.deepcopy(context)
+    def test_complete_parts_and_environment_pass_through(self):
+        parts = [{"type": "text", "text": "Application instructions and history"},
+                 image_input(b"abc", "image/png"),
+                 {"type": "text", "text": "Current question"}]
+        env = {"schema": "octo.context-envelope/v3", "items": [
+            {"namespace": "private.host", "name": "config", "payload": {"nested": [1, True]}},
+            {"namespace": "octo.execution", "name": "adapter",
+             "payload": {"type": "openclaw", "provider_agent_id": "main"}}]}
+        original = copy.deepcopy((parts, env))
         client = Client("unused.sock")
         client.kernel.invoke = Mock(return_value="stream")
-        for name, mode, supplied in [
-            ("invoke", "canonical", False),
-            ("invoke_with_context", "canonical", True),
-            ("invoke_native", "native", False),
-            ("invoke_native_with_context", "native", True),
-        ]:
-            with self.subTest(name=name):
-                args = ("codex", "hello", context) if supplied else ("codex", "hello")
-                self.assertEqual(getattr(client, name)(*args), "stream")
-                request = client.kernel.invoke.call_args.args[0]
-                self.assertEqual(request["protocol_mode"], mode)
-                self.assertEqual(
-                    len(request["contexts"]["items"]), 3 if supplied else 2
-                )
-                self.assertNotEqual(request["runId"], request["invocationId"])
-        self.assertEqual(context, original)
+        for mode in ("canonical", "native"):
+            request = build_input(parts, env, mode)
+            self.assertEqual(client.invoke_input(request), "stream")
+            self.assertEqual(request["inputs"], parts)
+            self.assertEqual(request["agentEnv"], env)
+            self.assertNotIn("contexts", request)
+            request["agentEnv"]["items"].clear()
+            request["inputs"].clear()
+        self.assertEqual((parts, env), original)
 
-    def test_conflicts_duplicates_and_invalid_mode_fail(self):
-        item = {
-            "namespace": "octo.execution",
-            "name": "adapter",
-            "payload": {"type": "openclaw"},
-        }
-        with self.assertRaises(ValueError):
-            build_input(
-                "codex",
-                "hello",
-                context={"schema": "octo.context-envelope/v3", "items": [item]},
-            )
-        with self.assertRaises(ValueError):
-            build_input(
-                "openclaw",
-                "hello",
-                context={"schema": "octo.context-envelope/v3", "items": [item, item]},
-            )
-        with self.assertRaises(ValueError):
-            build_input("codex", "hello", "invalid")
+    def test_empty_environment_and_native_default(self):
+        request = build_input([{"type": "text", "text": "hello"}],
+                              {"schema": "octo.context-envelope/v3", "items": []})
+        self.assertEqual(request["agentEnv"]["items"], [])
+        self.assertEqual(request["protocol_mode"], "native")
 
-    def test_openclaw_agent_and_explicit_policy_survive(self):
-        context = {
-            "schema": "octo.context-envelope/v3",
-            "items": [
-                {
-                    "namespace": "octo.execution",
-                    "name": "adapter",
-                    "payload": {"type": "openclaw", "provider_agent_id": "main"},
-                },
-                {
-                    "namespace": "octo.security",
-                    "name": "approval_policy",
-                    "payload": {"mode": "assisted"},
-                },
-            ],
-        }
-        self.assertEqual(
-            build_input("openclaw", "hello", context=context)["contexts"], context
-        )
+    def test_removed_contract_is_rejected(self):
+        request = build_input([{"type": "text", "text": "hello"}],
+                              {"schema": "octo.context-envelope/v3", "items": []})
+        request["contexts"] = request["agentEnv"]
+        with self.assertRaises(KernelError):
+            validate("InvokeInputWire", request)
+        del request["contexts"]
+        request["agentEnv"]["items"].append(
+            {"namespace": "octo.control", "name": "instructions", "payload": {}})
+        with self.assertRaises(KernelError):
+            validate("InvokeInputWire", request)

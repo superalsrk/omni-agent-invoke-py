@@ -2,7 +2,7 @@
 
 **Invoke Codex, Claude Code (CC), OpenClaw, DeepSeek Harness (DSH), and other supported agent harnesses from Python. Powered by [Octo Runtime](https://github.com/Mininglamp-OSS/octo-runtime).**
 
-A small, independent Python client and runnable **playboard** for a separately installed Octo Runtime Kernel. One local execution API for streaming, explicit Context, native output, cancellation and concurrent harness calls.
+A small, independent Python client and runnable **playboard** for a separately installed Octo Runtime Kernel. One local execution API for streaming, explicit AgentEnv, native output, cancellation and concurrent harness calls.
 
 ## Octo Runtime Is the Foundation
 
@@ -70,18 +70,23 @@ asyncio.run(main())
 
 See [examples](examples/README.md) for complete runnable programs, including imports and terminal-state checks.
 
-Four entry points make context and mode explicit:
+Use `invoke(adapter, prompt)` for canonical output or `invoke_native(adapter, prompt)` for native output. Both yield complete HostFrames; observe the terminal control frame.
+
+For full input, use:
 
 ```python
-client.invoke("codex", prompt)
-client.invoke_with_context("codex", prompt, context)
-client.invoke_native("codex", prompt)
-client.invoke_native_with_context("codex", prompt, context)
+from omni_agent_invoke import build_input
+
+request = build_input(
+    [{"type": "text", "text": "Application instructions and history"},
+     {"type": "text", "text": prompt}],
+    {"schema": "octo.context-envelope/v3", "items": []},
+    "canonical",
+)
+stream = client.invoke_input(request)
 ```
 
-The first two select canonical mode; the native variants select native mode. All yield **complete HostFrames**, with canonical content in `frame.event`, native content in `frame.payload`, and terminal execution state in `frame.control`. Always consume/check the terminal state before treating an execution as successful.
-
-Context means the Octo execution/background envelope. Explicit items merge with the selected Adapter and the default `ask` approval policy. See the typed Context, pure-text Input and image Input examples in [examples/README.md](examples/README.md). Image helpers include base64, byte length and SHA-256 metadata.
+Only `inputs` and `agentEnv` are required by Runtime. Both pass through without added content or merged defaults. AgentEnv carries execution settings; all business prompts and history belong in inputs. The old Context types, context methods and `contexts` wire field are removed. See [examples](examples/README.md) for images and explicit Adapter configuration.
 
 ## DeepSeek Harness and Other Providers
 
@@ -93,7 +98,7 @@ uv run playboard playboard --adapter claude-code --mode canonical --prompt 'Repl
 uv run playboard playboard --request examples/openclaw-request.json
 ```
 
-DSH must be installed/configured and registered by the independently running Runtime. See the [upstream DSH Adapter guide](https://github.com/Mininglamp-OSS/octo-runtime/blob/main/packages/octo-runtime-adapter-dsh/README.md). Native mode is available only when the selected Adapter advertises it. OpenClaw uses a Context item selecting an existing Gateway Agent, such as `provider_agent_id: "main"`.
+DSH must be installed/configured and registered by the independently running Runtime. See the [upstream DSH Adapter guide](https://github.com/Mininglamp-OSS/octo-runtime/blob/main/packages/octo-runtime-adapter-dsh/README.md). Native mode is available only when the selected Adapter advertises it. OpenClaw uses an agentEnv item selecting an existing Gateway Agent, such as `provider_agent_id: "main"`.
 
 Supporting a shared execution API does not imply identical Provider capabilities. Check `list` and the upstream guide. Live verification of Codex is not a claim that every Provider was tested.
 
@@ -108,7 +113,7 @@ Only Codex available locally? Replace the Adapter arguments with `codex codex` t
 ## Playboard and Explicit Controls
 
 ```sh
-uv run playboard playboard --adapter codex --mode native --prompt 'Say hello.' --context examples/context.json
+uv run playboard playboard --adapter codex --mode native --prompt 'Say hello.' --agent-env examples/agent-env.json
 uv run playboard submit --adapter codex --prompt 'Say hello.' --receipt .tmp/submitted-run.json
 uv run playboard get --ref .tmp/submitted-run.json
 uv run playboard subscribe --ref .tmp/submitted-run.json --after 0

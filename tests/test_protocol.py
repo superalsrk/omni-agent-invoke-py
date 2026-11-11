@@ -67,7 +67,7 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
         async def handler(writer, request):
             if request["method"] == "status":
                 await self.reply(
-                    writer, request, dict(ipc_version=1, kernel_instance_id="kernel")
+                    writer, request, dict(ipc_version=2, kernel_instance_id="kernel")
                 )
             elif request["method"] == "agent_run.invoke":
                 input = request["params"]["input"]
@@ -84,7 +84,7 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
                 )
 
         self.handler = handler
-        input = build_input("codex", "hello")
+        input = build_input([{"type":"text","text":"hello"}], {"schema":"octo.context-envelope/v3","items":[]}, "canonical")
         result = await self.client.submit(input)
         self.assertEqual(result["run_id"], input["runId"])
         self.assertEqual(self.calls, ["status", "agent_run.invoke", "agent_run.get"])

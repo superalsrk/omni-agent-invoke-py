@@ -35,14 +35,16 @@ async def run(args):
         if args.command in ("submit", "playboard"):
             if args.prompt is not None:
                 request = build_input(
-                    args.adapter,
-                    args.prompt,
+                    [{"type": "text", "text": args.prompt}],
+                    load(args.agent_env) if args.agent_env else {
+                        "schema": "octo.context-envelope/v3",
+                        "items": [{"namespace": "octo.execution", "name": "adapter", "payload": {"type": args.adapter}}],
+                    },
                     args.mode,
-                    load(args.context) if args.context else None,
                 )
             else:
-                if args.context:
-                    raise ValueError("--context requires --prompt")
+                if args.agent_env:
+                    raise ValueError("--agent-env requires --prompt")
                 request = load(args.request)
             ref = await kernel.submit(request)
             print(json.dumps({"ref": ref}), file=sys.stderr)
@@ -167,7 +169,7 @@ def main():
     parser.add_argument("--mode", choices=["canonical", "native"], default="canonical")
     for name, default in [
         ("prompt", None),
-        ("context", None),
+        ("agent-env", None),
         ("receipt", None),
         ("ref", None),
         ("reason", "playboard_user_cancelled"),
